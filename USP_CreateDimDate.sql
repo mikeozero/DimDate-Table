@@ -17,10 +17,7 @@ set @nd = str(@year)+'-01-01'
 set @cm = str(@year)+'-12-25'
 set @bx = str(@year)+'-12-26'
 -- canada day
-if datepart(dw,str(@year)+'-07-01') != 1
-    set @cd = str(@year)+'-07-01'
-else
-    set @cd = str(@year)+'-07-02'
+set @cd = str(@year)+'-07-01'
 
 -- generate @datetable
 declare @datetable table(dt date,wd int,wdn varchar(10),workday int,holiday int,holidayname varchar(20),weeknum varchar(20),weekstartdate date,weekenddate date)
