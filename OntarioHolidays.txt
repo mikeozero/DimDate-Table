@@ -1,0 +1,100 @@
+-- purpose: automaticly calculate  and update Ontario's public holidays of given years
+-- prerequisites: must have a DimDate table first (a table has name 'DimDate' and a date column at least) 
+-- create date: 2022-06-28 Mike Yu
+
+
+-- 1. calculate ontario public holidays:
+declare @ontarioholiday table(dt date,comments varchar(100))
+declare @year int, @endyear int
+select @year = datepart(year,Min(FullDate)), @endyear = datepart(year,Max(FullDate)) from DimDate
+
+while @year <= @endyear
+begin
+  declare @CanadaDay date,@NewYear date,@FamilyDay date,@GoodFriday date,@VictoriaDay date,@LabourDay date,@Thanksgiving date,@Christmas date,@BoxingDay date
+  -- new year
+  if datename(dw,str(@year)+'-01-01') = 'Saturday'
+    set @NewYear = str(@year)+'-01-03'
+  else if datename(dw,str(@year)+'-01-01') = 'Sunday'
+    set @NewYear = str(@year)+'-01-02'
+  else
+    set @NewYear = str(@year)+'-01-01'
+  -- christmas and boxing day
+  if datename(dw,str(@year)+'-12-25') = 'Friday'
+  begin
+    set @Christmas = str(@year)+'-12-25'
+	set @BoxingDay = str(@year)+'-12-28'
+  end
+  else if datename(dw,str(@year)+'-12-25') = 'Saturday'
+  begin
+    set @Christmas = str(@year)+'-12-27'
+	set @BoxingDay = str(@year)+'-12-28'
+  end
+  else if datename(dw,str(@year)+'-12-25') = 'Sunday'
+  begin
+    set @Christmas = str(@year)+'-12-26'
+	set @BoxingDay = str(@year)+'-12-27'
+  end
+  else
+  begin
+    set @Christmas = str(@year)+'-12-25'
+    set @BoxingDay = str(@year)+'-12-26'
+  end
+  -- canada day
+  if datename(dw,str(@year)+'-07-01') = 'Saturday'
+    set @CanadaDay = str(@year)+'-07-03'
+  else if datename(dw,str(@year)+'-07-01') = 'Sunday'
+    set @CanadaDay = str(@year)+'-07-02'
+  else
+    set @CanadaDay = str(@year)+'-07-01'
+  -- family day
+  select @FamilyDay = FullDate from (select FullDate,row_number()over(order by FullDate) rownum from DimDate where datepart(year,FullDate) = @year and [DayOfWeek] = 'Monday' and month(FullDate)=2)a where rownum=3
+  -- victoria's day
+  select @VictoriaDay = FullDate from DimDate where datepart(year,FullDate) = @year and [DayOfWeek] = 'Monday' and month(FullDate) = 5 and day(FullDate) between 18 and 24
+  -- labour day
+  select @LabourDay = FullDate from DimDate where datepart(year,FullDate) = @year and [DayOfWeek] = 'Monday' and month(FullDate) = 9 and day(FullDate) between 1 and 7
+  -- Thanksgiving
+  select @Thanksgiving = FullDate from DimDate where datepart(year,FullDate) = @year and [DayOfWeek] = 'Monday' and month(FullDate) = 10 and day(FullDate) between 8 and 14
+  -- Good Friday:
+  declare @mindex int = 24, @nindex int = 5 
+  declare @x int = ((@year%19)*19+@mindex)%30
+  declare @y int = ((@year%4)*2+(@year%7)*4+6*@x+@nindex)%7
+  declare @ed date
+  if @x+@y<10
+  begin
+    set @ed = str(@year)+'-03-'+str(@x+@y+22)
+    set @GoodFriday = dateadd(day,-2,@ed)
+  end
+  else
+  begin
+    if @x+@y-9=26
+        set @ed = str(@year)+'-04-19'
+    else if @x+@y-9=25 and @x=28 and @y=6 and @year%19>10
+        set @ed = str(@year)+'-04-18'
+    else
+        set @ed = str(@year)+'-04-'+str(@x+@y-9)
+    set @GoodFriday = dateadd(day,-2,@ed)
+  end
+
+  -- generate ontarioholiday temp table
+  insert into @ontarioholiday values
+  (@NewYear,'New Year'),
+  (@FamilyDay,'Family Day'),
+  (@GoodFriday,'Good Friday'),
+  (@VictoriaDay,'Victoria Day'),
+  (@CanadaDay,'Canada Day'),
+  (@LabourDay,'Labour Day'),
+  (@Thanksgiving,'Thanksgiving'),
+  (@Christmas,'Christmas'),
+  (@BoxingDay,'Boxing Day')
+
+  set @year += 1
+end
+
+select * from @ontarioholiday order by dt
+
+-- 2. update holiday infomation:
+update DimDate set HolidayFlag = case when o.dt is null then 0 else 1 end, HolidayText = o.comments from DimDate d left join @ontarioholiday o on d.FullDate = o.dt
+
+
+-- check result:
+select * from DimDate
