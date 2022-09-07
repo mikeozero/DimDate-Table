@@ -1,9 +1,10 @@
--- purpose: automaticly calculate  and update Ontario's public holidays of given years
--- prerequisites: must have a DimDate table first (a table has name 'DimDate' and a date column at least) 
 -- create date: 2022-06-28 Mike Yu
+-- purpose: automaticly calculate  and update Ontario's public observed holidays of given years
+-- prerequisites: must have a DimDate table first (a table has name 'DimDate' and a date column at least) 
+-- note: When a public holiday falls on a weekend, it is observed the following Monday
 
 
--- 1. calculate ontario public holidays:
+-- 1. calculate ontario public observed holidays:
 declare @ontarioholiday table(dt date,comments varchar(100))
 declare @year int, @endyear int
 select @year = datepart(year,Min(FullDate)), @endyear = datepart(year,Max(FullDate)) from DimDate
